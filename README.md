@@ -6,60 +6,41 @@ Chatbot berbasis **Retrieval-Augmented Generation (RAG)** yang menjawab pertanya
 
 ## Tech Stack
 
-| Component | Library |
-|---|---|
-| PDF Extraction | pypdf |
-| Embeddings | sentence-transformers/all-MiniLM-L6-v2 |
-| Vector DB | FAISS |
-| Language Model | TinyLlama/TinyLlama-1.1B-Chat-v1.0 |
-| UI (Bonus) | Streamlit |
+| Component      | Library / Model                        |
+| -------------- | -------------------------------------- |
+| PDF Extraction | pypdf                                  |
+| Embeddings     | sentence-transformers/all-MiniLM-L6-v2 |
+| Vector DB      | FAISS (IndexFlatIP)                    |
+| Language Model | TinyLlama/TinyLlama-1.1B-Chat-v1.0     |
+| UI (Bonus)     | Streamlit                              |
 
 ---
 
-## System Architecture
+## Chosen Models
 
-```
-PDF Collection
-    │
-    ▼
-PDF Loader (loader.py)
-    │   • Read all .pdf files
-    │   • Extract text per page
-    │
-    ▼
-Text Chunking (chunker.py)
-    │   • chunk_size = 500 chars
-    │   • chunk_overlap = 100 chars
-    │
-    ▼
-Embedding Generation (embedder.py)
-    │   • all-MiniLM-L6-v2
-    │   • L2-normalised vectors (dim=384)
-    │
-    ▼
-FAISS Vector DB (vectorstore.py)
-    │   • IndexFlatIP (cosine similarity)
-    │   • faiss_index/faiss_index.bin
-    │   • faiss_index/metadata.pkl
-    │
-    ▼
-User Question ──► Semantic Retrieval (retriever.py)
-                    │   • Encode query
-                    │   • top-k=5 chunks
-                    │
-                    ▼
-              Prompt Construction
-                    │   • TinyLlama chat template
-                    │   • Injected context + question
-                    │
-                    ▼
-              LLM Generation (rag_pipeline.py)
-                    │   • TinyLlama-1.1B-Chat
-                    │   • max_new_tokens=512
-                    │
-                    ▼
-              Answer + Source Citations
-```
+### 1. Embedding Model: `sentence-transformers/all-MiniLM-L6-v2`
+
+- **Dimensionality**: 384 dimensions.
+- **Rationale**: Merupakan model embedding yang sangat ringan, efisien, dan cepat. Memiliki performa luar biasa dalam pemetaan semantik dokumen teks (mapping text to dense vectors) dan sangat cocok untuk dijalankan pada perangkat lokal dengan memory footprint (RAM/VRAM) yang minimal.
+- **Similarity Metric**: Menggunakan metrik **Cosine Similarity** (diimplementasikan via FAISS `IndexFlatIP` dengan vektor hasil L2-normalisasi) untuk mencari chunk teks yang paling relevan dengan query pengguna.
+
+### 2. Large Language Model: `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
+
+- **Size**: 1.1 Miliar parameters (~2.2 GB VRAM/RAM required).
+- **Rationale**: Model bahasa kausal (Causal LM) berukuran mini yang dioptimalkan untuk percakapan (chat). Pilihan terbaik untuk eksekusi lokal pada CPU maupun GPU kelas konsumen. Mendukung template instruksi percakapan standar secara konsisten sehingga andal dalam memproses prompt RAG.
+
+---
+
+## Dataset Source & Annotations
+
+- **Source**: Dataset ini diperoleh dari public source di Kaggle: [Dataset of PDF Files by Manisha717](https://www.kaggle.com/datasets/manisha717/dataset-of-pdf-files). Dokumen PDF di dalamnya bersumber dari **Library of Congress Web Archives (LCWA)** untuk dokumen berekstensi `.pdf` pada domain `.gov`.
+- **License**: Berdasarkan metadata Kaggle, lisensi dataset ini adalah **Unknown / Creative Work** (merupakan data publik terbuka yang ditujukan untuk keperluan testing, evaluasi, dan riset RAG).
+- **Annotations & Metadata**: Metadata dataset lengkap disediakan di dalam file [lcwa_gov_pdf_metadata.csv](file:///C:/Users/rakad/OneDrive/Dokumen/Projects/nolimit-ds-test-rakadaffa/data/pdfs/lcwa_gov_pdf_metadata.csv) dengan rincian kolom annotations sebagai berikut:
+  - `urlkey` / `original`: URL asal dari dokumen PDF pemerintah yang diarsipkan.
+  - `timestamp`: Waktu saat dokumen diarsipkan.
+  - `pdf_version`, `creator_tool`, `producer`: Metadata metadata penyusun file PDF.
+  - `pages`, `page_width`, `page_height`, `file_size`: Dimensi halaman dan ukuran file fisik PDF.
+  - `sha256` / `sha512` / `digest`: Hash kriptografis unik yang digunakan untuk penamaan file PDF fisik di dalam folder `data/pdfs/`.
 
 ---
 
@@ -68,10 +49,11 @@ User Question ──► Semantic Retrieval (retriever.py)
 ```
 nolimit-ds-test-raka/
 ├── data/
-│   └── pdfs/               ← letakkan file PDF di sini
+│   └── pdfs/               ← Test dataset (30 File)
 │
-├── notebooks/
-│   └── rag_pipeline.ipynb  ← notebook utama (jalankan di Colab)
+├── notebook/
+│   ├── rag_pipeline_kaggle.ipynb   ← Notebook untuk kaggle
+│   └── rag_pipeline.ipynb          ← Notebook lokal
 │
 ├── src/
 │   ├── loader.py           ← PDF loading & metadata extraction
@@ -79,21 +61,18 @@ nolimit-ds-test-raka/
 │   ├── embedder.py         ← SentenceTransformer encoding
 │   ├── vectorstore.py      ← FAISS index build/save/load/search
 │   ├── retriever.py        ← query → top-k chunks
-│   └── rag_pipeline.py     ← orchestrates full pipeline + LLM
+│   └── rag_pipeline.py     ← orchestrator pipeline utama + LLM
 │
-├── app/
-│   └── streamlit_app.py    ← Streamlit chatbot UI (bonus)
-│
-├── faiss_index/            ← generated after indexing
+├── faiss_index/            ← Dibuat otomatis setelah indexing
 │   ├── faiss_index.bin
 │   └── metadata.pkl
 │
-├── outputs/
+├── outputs/                ← Hasil running evaluasi & sample
 │   ├── sample_results.md
 │   └── evaluation_results.md
 │
 ├── flowchart/
-│   └── rag_pipeline.png    ← architecture diagram
+│   └── rag_pipeline.png    ← Diagram arsitektur sistem
 │
 ├── requirements.txt
 ├── README.md
@@ -102,65 +81,86 @@ nolimit-ds-test-raka/
 
 ---
 
-## Quick Start — Google Colab
+## Setup & Installation Instructions
 
-1. Buka `notebooks/rag_pipeline.ipynb` di Google Colab
-2. Set runtime ke **T4 GPU**: Runtime → Change runtime type → T4
-3. Jalankan cell **0** untuk cek GPU
-4. Jalankan cell **1** untuk install dependencies
-5. Upload PDF ke `data/pdfs/` (cell 4)
-6. Jalankan cell **7** untuk indexing pipeline
-7. Jalankan cell **8** untuk load LLM
-8. Jalankan cell **10** untuk test query
+### 1. Setup Lokal (Local Environment Setup)
 
----
+Ikuti langkah-langkah di bawah ini untuk memasang dan menjalankan aplikasi secara lokal:
 
-## Quick Start — Local
+#### **Prasyarat (Prerequisites)**:
+
+- Python versi 3.9 ke atas terinstall di sistem Anda.
+
+#### **Langkah-langkah Instalasi**:
+
+1.  **Clone Repository** ke komputer Anda.
+2.  **Buat Virtual Environment** di folder proyek:
+    ```bash
+    python -m venv .venv
+    ```
+3.  **Aktifkan Virtual Environment**:
+    - **Windows (PowerShell)**:
+      ```powershell
+      .venv\Scripts\activate
+      ```
+    - **Linux / macOS**:
+      ```bash
+      source .venv/bin/activate
+      ```
+4.  **Install Dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+    _Catatan: File `requirements.txt` telah dikonfigurasi untuk Windows lokal dengan menggunakan `faiss-cpu`. Jika berjalan di Google Colab dengan GPU, gunakan `faiss-gpu`._
+
+#### **Menjalankan Pipeline RAG via Python CLI**:
+
+Masuk ke folder `src` dan jalankan perintah Python berikut:
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Letakkan PDF di data/pdfs/
-
-# Jalankan RAG pipeline
 cd src
 python -c "
 from rag_pipeline import RAGPipeline
 pipe = RAGPipeline()
 pipe.index()
 result = pipe.query('What is the main topic of the documents?')
-print(result['answer'])
-for src in result['sources']:
-    print(src['filename'], 'page', src['page_number'], 'score', src['score'])
+print('ANSWER:', result['answer'])
 "
 ```
 
-## Streamlit UI
+#### **Menjalankan Streamlit Chatbot UI**:
+
+Untuk meluncurkan antarmuka web lokal (Streamlit):
 
 ```bash
-streamlit run app/streamlit_app.py
+streamlit run src/streamlit_app.py
 ```
+
+Aplikasi akan otomatis terbuka pada browser Anda di tautan: **`http://localhost:8501`**
+
+---
+
+### 2. Setup Kaggle (Cloud Execution)
+
+Jika Anda ingin menjalankan notebook di Kaggle:
+
+1.  Buat **Notebook** baru di Kaggle.
+2.  Unggah berkas notebook khusus kaggle ke Kaggle Notebook Anda.
+3.  Ubah pengaturan **Accelerator** di panel kanan menjadi **GPU T4** untuk mengaktifkan pemrosesan GPU secara gratis.
+4.  Tambahkan input dataset ke notebook Anda dengan mengeklik tombol **Add Input** di kanan atas, lalu cari dataset: **`manisha717/dataset-of-pdf-files`**.
+5.  Jalankan cell **0** (Runtime Check) untuk memverifikasi GPU aktif.
+6.  Jalankan cell **1** (Install Dependencies) untuk menginstal semua pustaka pendukung (termasuk `faiss-gpu`).
+7.  Jalankan cell **2** untuk memuat pustaka pembantu secara otomatis.
+8.  Jalankan cell hingga selesai untuk memproses indeks FAISS, memuat TinyLlama, menguji kueri RAG, dan melakukan evaluasi.
 
 ---
 
 ## Configuration
 
-| Parameter | Default | Description |
-|---|---|---|
-| `chunk_size` | 500 | Characters per chunk |
-| `chunk_overlap` | 100 | Overlap between chunks |
-| `top_k` | 5 | Retrieved chunks per query |
-| Embedding model | all-MiniLM-L6-v2 | 384-dim, fast |
-| LLM | TinyLlama-1.1B-Chat | ~2.2GB, runs on T4 |
-
----
-
-## Features
-
-- ✅ Multi-PDF indexing — baca seluruh direktori secara otomatis
-- ✅ Semantic search — cosine similarity via FAISS IndexFlatIP
-- ✅ Question answering — TinyLlama dengan chat template
-- ✅ Source citation — filename, page number, similarity score, snippet
-- ✅ Persistent index — simpan & load FAISS tanpa re-indexing
-- ✅ Streamlit UI — chatbot interface dengan source expander
+| Parameter       | Default             | Description                                          |
+| --------------- | ------------------- | ---------------------------------------------------- |
+| `chunk_size`    | 500                 | Ukuran karakter per chunk teks                       |
+| `chunk_overlap` | 100                 | Jumlah karakter tumpang tindih (overlap) antar chunk |
+| `top_k`         | 5                   | Jumlah dokumen teks relevan yang diambil per kueri   |
+| Embedding model | all-MiniLM-L6-v2    | Model representasi semantik (384 dimensi)            |
+| LLM             | TinyLlama-1.1B-Chat | Model generator teks lokal (~2.2GB VRAM/RAM)         |
