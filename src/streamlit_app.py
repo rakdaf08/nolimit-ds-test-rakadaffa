@@ -34,8 +34,19 @@ st.caption("Ask questions and get answers grounded in your document collection."
 with st.sidebar:
     st.header("⚙️ Settings")
 
-    pdf_dir   = st.text_input("PDF Directory", value="data/pdfs")
-    index_dir = st.text_input("Index Directory", value="faiss_index")
+    # Detect Kaggle environment to set absolute paths as defaults
+    is_kaggle = os.path.exists("/kaggle/working")
+    kaggle_project_root = "/kaggle/working/nolimit-ds-test-rakadaffa"
+    
+    if is_kaggle and os.path.exists(kaggle_project_root):
+        default_pdf_dir = os.path.join(kaggle_project_root, "data/pdfs")
+        default_index_dir = os.path.join(kaggle_project_root, "faiss_index")
+    else:
+        default_pdf_dir = "data/pdfs"
+        default_index_dir = "faiss_index"
+
+    pdf_dir   = st.text_input("PDF Directory", value=default_pdf_dir)
+    index_dir = st.text_input("Index Directory", value=default_index_dir)
     top_k     = st.slider("Top-K chunks to retrieve", min_value=1, max_value=10, value=5)
 
     st.divider()
