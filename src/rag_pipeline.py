@@ -106,7 +106,7 @@ class RAGPipeline:
             "text-generation",
             model=self.llm,
             tokenizer=self.tokenizer,
-            device=0 if self.device == "cuda" else -1,
+            device=None if self.device == "cuda" else -1,
         )
         print("LLM loaded.")
 
